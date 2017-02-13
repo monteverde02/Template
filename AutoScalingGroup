@@ -39,7 +39,10 @@
       "Type": "String",
       "ConstraintDescription": "If set to true cloudwach would be enabled and 1 minute logging would apply",
       "Default": false,
-      "AllowedValues": [ true, false ]
+      "AllowedValues": [
+        true,
+        false
+      ]
     }
   },
   "Mappings": {
@@ -396,7 +399,9 @@
         "KeyName": {
           "Ref": "KeyName"
         },
-        "InstanceMonitoring": { "Ref": "EnableCloudWatch" },
+        "InstanceMonitoring": {
+          "Ref": "EnableCloudWatch"
+        },
         "SecurityGroups": [
           {
             "Ref": "HttpPortOpenSecurityGroup"
@@ -480,12 +485,17 @@
     "WebServerGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
-        "AvailabilityZones": [ "us-west-2b", "us-west-2c" ],
+        "AvailabilityZones": [
+          "us-west-2b",
+          "us-west-2c"
+        ],
         "VPCZoneIdentifier": [
           {
             "Ref": "DMZSubnet01"
           },
-          { "Ref": "DMZSubnet02" }
+          {
+            "Ref": "DMZSubnet02"
+          }
         ],
         "Tags": [
           {
@@ -525,11 +535,19 @@
         "MetricsCollection": [
           {
             "Granularity": "1Minute",
-            "Metrics": [ "GroupMinSize", "GroupMaxSize" ]
+            "Metrics": [
+              "GroupMinSize",
+              "GroupMaxSize"
+            ]
           }
         ]
       },
-      "DependsOn": [ "DMZSubnet02", "DMZSubnet01", "ElasticLoadBalancer", "WebServerLaunchConfiguration" ]
+      "DependsOn": [
+        "DMZSubnet02",
+        "DMZSubnet01",
+        "ElasticLoadBalancer",
+        "WebServerLaunchConfiguration"
+      ]
     },
     "WebServerScaleUpPolicy": {
       "Type": "AWS::AutoScaling::ScalingPolicy",
@@ -623,10 +641,18 @@
       "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties": {
         "Subnets": [
-          { "Ref": "DMZSubnet01" },
-          { "Ref": "DMZSubnet02" }
+          {
+            "Ref": "DMZSubnet01"
+          },
+          {
+            "Ref": "DMZSubnet02"
+          }
         ],
-        "SecurityGroups": [{"Ref": "HttpPortOpenSecurityGroup"}],
+        "SecurityGroups": [
+          {
+            "Ref": "HttpPortOpenSecurityGroup"
+          }
+        ],
         "CrossZone": "true",
         "Listeners": [
           {
@@ -644,5 +670,5 @@
         }
       }
     }
-    }
+  }
 }
