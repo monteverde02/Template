@@ -322,6 +322,7 @@
       "Properties": {
         "Path": "/",
         "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSSMFullAccess",
           "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM",
           "arn:aws:iam::313504169923:policy/CWPolicyAllowCloudWatchWrite",
           "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy"
@@ -452,6 +453,10 @@
                 "cd /home/ec2-user/ \n",
                 "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
                 "yum -y install codedeploy-agent.noarch.rpm \n",
+                "cd /tmp \n",
+                "curl https://amazon-ssm-us-west-2.s3.amazonaws.com/latest/linux_amd64/amazon-ssm-agent.rpm -o amazon-ssm-agent.rpm \n",
+                "yum install -y amazon-ssm-agent.rpm \n",
+                "rm amazon-ssm-agent.rpm -f \n",
                 "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>End - check back soon </h3></body></head></html>\" > /var/www/html/index.html \n"
               ]
             ]
@@ -497,8 +502,10 @@
         "LaunchConfigurationName": {
           "Ref": "WebServerLaunchConfiguration"
         },
-        "MinSize": "0",
-        "MaxSize": "3",
+        "MinSize": "1",
+        "MaxSize": "2",
+        "HealthCheckGracePeriod": "60",
+        "HealthCheckType": "ELB",
         "LoadBalancerNames": [
           {
             "Ref": "ElasticLoadBalancer"
@@ -514,21 +521,13 @@
             "autoscaling:EC2_INSTANCE_TERMINATE",
             "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
           ]
-        }
-      },
-      "CreationPolicy": {
-        "ResourceSignal": {
-          "Timeout": "PT15M",
-          "Count": "1"
-        }
-      },
-      "UpdatePolicy": {
-        "AutoScalingRollingUpdate": {
-          "MinInstancesInService": "1",
-          "MaxBatchSize": "1",
-          "PauseTime": "PT30M",
-          "WaitOnResourceSignals": "true"
-        }
+        },
+        "MetricsCollection": [
+          {
+            "Granularity": "1Minute",
+            "Metrics": [ "GroupMinSize", "GroupMaxSize" ]
+          }
+        ]
       },
       "DependsOn": [ "DMZSubnet02", "DMZSubnet01", "ElasticLoadBalancer", "WebServerLaunchConfiguration" ]
     },
@@ -539,7 +538,7 @@
         "AutoScalingGroupName": {
           "Ref": "WebServerGroup"
         },
-        "Cooldown": "60",
+        "Cooldown": "360",
         "ScalingAdjustment": "1"
       },
       "DependsOn": [
@@ -553,7 +552,7 @@
         "AutoScalingGroupName": {
           "Ref": "WebServerGroup"
         },
-        "Cooldown": "60",
+        "Cooldown": "360",
         "ScalingAdjustment": "-1"
       },
       "DependsOn": [
@@ -568,7 +567,7 @@
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "300",
-        "EvaluationPeriods": "2",
+        "EvaluationPeriods": "1",
         "Threshold": "90",
         "AlarmActions": [
           {
@@ -593,13 +592,13 @@
     "CPUAlarmLow": {
       "Type": "AWS::CloudWatch::Alarm",
       "Properties": {
-        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "AlarmDescription": "Scale-down if CPU < 40% for 20 minutes",
         "MetricName": "CPUUtilization",
         "Namespace": "AWS/EC2",
         "Statistic": "Average",
         "Period": "300",
-        "EvaluationPeriods": "2",
-        "Threshold": "70",
+        "EvaluationPeriods": "4",
+        "Threshold": "40",
         "AlarmActions": [
           {
             "Ref": "WebServerScaleDownPolicy"
@@ -627,6 +626,7 @@
           { "Ref": "DMZSubnet01" },
           { "Ref": "DMZSubnet02" }
         ],
+        "SecurityGroups": [{"Ref": "HttpPortOpenSecurityGroup"}],
         "CrossZone": "true",
         "Listeners": [
           {
@@ -645,5 +645,4 @@
       }
     }
     }
-  }
 }
