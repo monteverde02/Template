@@ -27,6 +27,19 @@
         "Dev",
         "Production"
       ]
+    },
+    "NotificationEmail": {
+      "Description": "Email where to send all alerts.",
+      "Type": "String",
+      "ConstraintDescription": "Enter your mail address.",
+      "Default": "monteverde02@hotmail.com"
+    },
+    "EnableCloudWatch": {
+      "Description": "Enable Cloud Watch?",
+      "Type": "String",
+      "ConstraintDescription": "If set to true cloudwach would be enabled and 1 minute logging would apply",
+      "Default": false,
+      "AllowedValues": [ true, false ]
     }
   },
   "Mappings": {
@@ -232,49 +245,6 @@
         "RamirosBuildPipelineStory"
       ]
     },
-    "WebServersLoadBalancer": {
-      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
-      "DependsOn": [
-        "WebServer01",
-        "InternetGateway"
-      ],
-      "Properties": {
-        "Scheme": "internet-facing",
-        "CrossZone": true,
-        "Subnets": [
-          {
-            "Ref": "DMZSubnet02"
-          },
-          {
-            "Ref": "DMZSubnet01"
-          }
-        ],
-        "Listeners": [
-          {
-            "LoadBalancerPort": "80",
-            "InstancePort": "80",
-            "Protocol": "HTTP"
-          }
-        ],
-        "HealthCheck": {
-          "Target": "HTTP:80/",
-          "HealthyThreshold": "4",
-          "UnhealthyThreshold": "2",
-          "Interval": "5",
-          "Timeout": "2"
-        },
-        "SecurityGroups": [
-          {
-            "Ref": "HttpPortOpenSecurityGroup"
-          }
-        ],
-        "Instances": [
-          {
-            "Ref": "WebServer01"
-          }
-        ]
-      }
-    },
     "DMZSubnet01": {
       "Type": "AWS::EC2::Subnet",
       "Properties": {
@@ -410,8 +380,8 @@
         "EC2InstanceRoles"
       ]
     },
-    "WebServer01": {
-      "Type": "AWS::EC2::Instance",
+    "WebServerLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
       "DependsOn": [
         "DMZSubnet01",
         "DMZSubnet01",
@@ -425,6 +395,15 @@
         "KeyName": {
           "Ref": "KeyName"
         },
+        "InstanceMonitoring": { "Ref": "EnableCloudWatch" },
+        "SecurityGroups": [
+          {
+            "Ref": "HttpPortOpenSecurityGroup"
+          },
+          {
+            "Ref": "BastionHostSecurityGroup"
+          }
+        ],
         "IamInstanceProfile": {
           "Ref": "EC2InstanceProfile"
         },
@@ -445,34 +424,9 @@
             }
           ]
         },
-        "NetworkInterfaces": [
-          {
-            "AssociatePublicIpAddress": "true",
-            "DeviceIndex": "0",
-            "SubnetId": {
-              "Ref": "DMZSubnet01"
-            },
-            "GroupSet": [
-              {
-                "Ref": "HttpPortOpenSecurityGroup"
-              },
-              {
-                "Ref": "BastionHostSecurityGroup"
-              }
-            ]
-          }
-        ],
         "InstanceType": {
           "Ref": "InstanceType"
         },
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": {
-              "Ref": "CodePipelineDeploymentGroupName"
-            }
-          }
-        ],
         "UserData": {
           "Fn::Base64": {
             "Fn::Join": [
@@ -498,13 +452,198 @@
                 "cd /home/ec2-user/ \n",
                 "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
                 "yum -y install codedeploy-agent.noarch.rpm \n",
-                "rm codedeploy-agent.noarch.rpm -f \n",
                 "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>End - check back soon </h3></body></head></html>\" > /var/www/html/index.html \n"
               ]
             ]
           }
         }
       }
+    },
+    "NotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "Subscription": [
+          {
+            "Endpoint": {
+              "Ref": "NotificationEmail"
+            },
+            "Protocol": "email"
+          }
+        ]
+      }
+    },
+    "WebServerGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "AvailabilityZones": [ "us-west-2b", "us-west-2c" ],
+        "VPCZoneIdentifier": [
+          {
+            "Ref": "DMZSubnet01"
+          },
+          { "Ref": "DMZSubnet02" }
+        ],
+        "Tags": [
+          {
+            "Key": "WebApplicationVPC",
+            "Value": "RamirosBuildPipelineStory",
+            "PropagateAtLaunch": "true"
+          },
+          {
+            "Key": "Name",
+            "Value": "Dev",
+            "PropagateAtLaunch": "true"
+          }
+        ],
+        "LaunchConfigurationName": {
+          "Ref": "WebServerLaunchConfiguration"
+        },
+        "MinSize": "0",
+        "MaxSize": "3",
+        "LoadBalancerNames": [
+          {
+            "Ref": "ElasticLoadBalancer"
+          }
+        ],
+        "NotificationConfiguration": {
+          "TopicARN": {
+            "Ref": "NotificationTopic"
+          },
+          "NotificationTypes": [
+            "autoscaling:EC2_INSTANCE_LAUNCH",
+            "autoscaling:EC2_INSTANCE_LAUNCH_ERROR",
+            "autoscaling:EC2_INSTANCE_TERMINATE",
+            "autoscaling:EC2_INSTANCE_TERMINATE_ERROR"
+          ]
+        }
+      },
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Timeout": "PT15M",
+          "Count": "1"
+        }
+      },
+      "UpdatePolicy": {
+        "AutoScalingRollingUpdate": {
+          "MinInstancesInService": "1",
+          "MaxBatchSize": "1",
+          "PauseTime": "PT30M",
+          "WaitOnResourceSignals": "true"
+        }
+      },
+      "DependsOn": [ "DMZSubnet02", "DMZSubnet01", "ElasticLoadBalancer", "WebServerLaunchConfiguration" ]
+    },
+    "WebServerScaleUpPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "WebServerGroup"
+        },
+        "Cooldown": "60",
+        "ScalingAdjustment": "1"
+      },
+      "DependsOn": [
+        "WebServerGroup"
+      ]
+    },
+    "WebServerScaleDownPolicy": {
+      "Type": "AWS::AutoScaling::ScalingPolicy",
+      "Properties": {
+        "AdjustmentType": "ChangeInCapacity",
+        "AutoScalingGroupName": {
+          "Ref": "WebServerGroup"
+        },
+        "Cooldown": "60",
+        "ScalingAdjustment": "-1"
+      },
+      "DependsOn": [
+        "WebServerGroup"
+      ]
+    },
+    "CPUAlarmHigh": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-up if CPU > 90% for 4 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "90",
+        "AlarmActions": [
+          {
+            "Ref": "WebServerScaleUpPolicy"
+          }
+        ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "WebServerGroup"
+            }
+          }
+        ],
+        "ComparisonOperator": "GreaterThanThreshold"
+      },
+      "DependsOn": [
+        "WebServerGroup",
+        "WebServerScaleUpPolicy"
+      ]
+    },
+    "CPUAlarmLow": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmDescription": "Scale-down if CPU < 70% for 10 minutes",
+        "MetricName": "CPUUtilization",
+        "Namespace": "AWS/EC2",
+        "Statistic": "Average",
+        "Period": "300",
+        "EvaluationPeriods": "2",
+        "Threshold": "70",
+        "AlarmActions": [
+          {
+            "Ref": "WebServerScaleDownPolicy"
+          }
+        ],
+        "Dimensions": [
+          {
+            "Name": "AutoScalingGroupName",
+            "Value": {
+              "Ref": "WebServerGroup"
+            }
+          }
+        ],
+        "ComparisonOperator": "LessThanThreshold"
+      },
+      "DependsOn": [
+        "WebServerGroup",
+        "WebServerScaleDownPolicy"
+      ]
+    },
+    "ElasticLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties": {
+        "Subnets": [
+          { "Ref": "DMZSubnet01" },
+          { "Ref": "DMZSubnet02" }
+        ],
+        "CrossZone": "true",
+        "Listeners": [
+          {
+            "LoadBalancerPort": "80",
+            "InstancePort": "80",
+            "Protocol": "HTTP"
+          }
+        ],
+        "HealthCheck": {
+          "Target": "HTTP:80/",
+          "HealthyThreshold": "3",
+          "UnhealthyThreshold": "2",
+          "Interval": "6",
+          "Timeout": "2"
+        }
+      }
+    }
     }
   }
 }
