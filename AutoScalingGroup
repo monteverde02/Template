@@ -1,0 +1,510 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Autoscaling group, using build pipeline with tags in dev",
+  "Parameters": {
+    "InstanceType": {
+      "Description": "EC2 instance type for Jenkins Server",
+      "Type": "String",
+      "Default": "t2.micro",
+      "AllowedValues": [
+        "t1.micro",
+        "t2.micro"
+      ],
+      "ConstraintDescription": "must be a valid EC2 instance type."
+    },
+    "KeyName": {
+      "Description": "The EC2 Key Pair to allow SSH access to EC2 instances",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "must be the name of an existing EC2 KeyPair.",
+      "Default": "OR-AWS"
+    },
+    "CodePipelineDeploymentGroupName": {
+      "Description": "The EC2 Key Pair to allow SSH access to EC2 instances",
+      "Type": "String",
+      "ConstraintDescription": "Enter the code pipeline that this set is expected to attach..",
+      "Default": "Dev",
+      "AllowedValues": [
+        "Dev",
+        "Production"
+      ]
+    }
+  },
+  "Mappings": {
+    "AWSInstanceType2Arch": {
+      "t1.micro": {
+        "Arch": "PV64"
+      },
+      "t2.micro": {
+        "Arch": "HVM64"
+      }
+    },
+    "AWSRegionArch2AMI": {
+      "us-east-1": {
+        "PV64": "ami-1ccae774",
+        "HVM64": "ami-1ecae776"
+      },
+      "us-west-2": {
+        "PV64": "ami-ff527ecf",
+        "HVM64": "ami-e7527ed7"
+      },
+      "us-west-1": {
+        "PV64": "ami-d514f291",
+        "HVM64": "ami-d114f295"
+      },
+      "eu-west-1": {
+        "PV64": "ami-bf0897c8",
+        "HVM64": "ami-a10897d6"
+      },
+      "eu-central-1": {
+        "PV64": "ami-ac221fb1",
+        "HVM64": "ami-a8221fb5"
+      },
+      "ap-northeast-1": {
+        "PV64": "ami-acd9e8fe",
+        "HVM64": "ami-68d8e93a"
+      },
+      "ap-southeast-1": {
+        "PV64": "ami-27f90e27",
+        "HVM64": "ami-cbf90ecb"
+      },
+      "ap-southeast-2": {
+        "PV64": "ami-ff9cecc5",
+        "HVM64": "ami-fd9cecc7"
+      },
+      "sa-east-1": {
+        "PV64": "ami-fd9925e0",
+        "HVM64": "ami-b52890a8"
+      }
+    }
+  },
+  "Resources": {
+    "RamirosBuildPipelineStory": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.10.0.0/16",
+        "EnableDnsSupport": "true",
+        "EnableDnsHostnames": "true",
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "WebApplicationVPC",
+            "Value": "RamirosBuildPipelineStory"
+          }
+        ]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "RamirosBuildPipelineStory"
+            }
+          }
+        ]
+      },
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ]
+    },
+    "AttachVpnGateway": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": [
+        "InternetGateway"
+      ]
+    },
+    "GatewayRouteInternet": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": [
+        "InternetGateway",
+        "AttachVpnGateway",
+        "RoutingTable"
+      ],
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "RoutingTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      }
+    },
+    "RoutingTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "RamirosBuildPipelineStory"
+            }
+          }
+        ]
+      }
+    },
+    "HttpPortOpenSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "HTTP from the world inboud",
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "OpenPort80"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      },
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ]
+    },
+    "PrivateSubnetSecurityGroup": {
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ],
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Rule to block all inbound traffic from the net",
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "PrivateSubnetSecurityGroup"
+          }
+        ]
+      }
+    },
+    "BastionHostSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "RDP connection to Bastion Host",
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "BastionHostSecurityGroup"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3389",
+            "ToPort": "3389",
+            "CidrIp": "64.180.21.78/32"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "64.180.21.78/32"
+          }
+        ]
+      },
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ]
+    },
+    "WebServersLoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+      "DependsOn": [
+        "WebServer01",
+        "InternetGateway"
+      ],
+      "Properties": {
+        "Scheme": "internet-facing",
+        "CrossZone": true,
+        "Subnets": [
+          {
+            "Ref": "DMZSubnet02"
+          },
+          {
+            "Ref": "DMZSubnet01"
+          }
+        ],
+        "Listeners": [
+          {
+            "LoadBalancerPort": "80",
+            "InstancePort": "80",
+            "Protocol": "HTTP"
+          }
+        ],
+        "HealthCheck": {
+          "Target": "HTTP:80/",
+          "HealthyThreshold": "4",
+          "UnhealthyThreshold": "2",
+          "Interval": "5",
+          "Timeout": "2"
+        },
+        "SecurityGroups": [
+          {
+            "Ref": "HttpPortOpenSecurityGroup"
+          }
+        ],
+        "Instances": [
+          {
+            "Ref": "WebServer01"
+          }
+        ]
+      }
+    },
+    "DMZSubnet01": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-west-2c",
+        "CidrBlock": "10.10.3.0/24",
+        "MapPublicIpOnLaunch": "true",
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "RamirosBuildPipelineStory"
+            }
+          }
+        ]
+      },
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ]
+    },
+    "DMZSubnet01Association": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "DMZSubnet01"
+        },
+        "RouteTableId": {
+          "Ref": "RoutingTable"
+        }
+      },
+      "DependsOn": [
+        "DMZSubnet01"
+      ]
+    },
+    "DMZSubnet02": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-west-2b",
+        "CidrBlock": "10.10.2.0/24",
+        "MapPublicIpOnLaunch": "true",
+        "VpcId": {
+          "Ref": "RamirosBuildPipelineStory"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "RamirosBuildPipelineStory"
+            }
+          }
+        ]
+      },
+      "DependsOn": [
+        "RamirosBuildPipelineStory"
+      ]
+    },
+    "DMZSubnet02Association": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "DMZSubnet02"
+        },
+        "RouteTableId": {
+          "Ref": "RoutingTable"
+        }
+      },
+      "DependsOn": [
+        "DMZSubnet02"
+      ]
+    },
+    "EC2InstanceRoles": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Path": "/",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM",
+          "arn:aws:iam::313504169923:policy/CWPolicyAllowCloudWatchWrite",
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy"
+        ],
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "EC2InstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "EC2InstanceRoles"
+          }
+        ]
+      },
+      "DependsOn": [
+        "EC2InstanceRoles"
+      ]
+    },
+    "RolePolicies": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "root",
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": "*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "EC2InstanceRoles"
+          }
+        ]
+      },
+      "DependsOn": [
+        "EC2InstanceRoles"
+      ]
+    },
+    "WebServer01": {
+      "Type": "AWS::EC2::Instance",
+      "DependsOn": [
+        "DMZSubnet01",
+        "DMZSubnet01",
+        "DMZSubnet01Association",
+        "InternetGateway",
+        "RoutingTable",
+        "AttachVpnGateway",
+        "EC2InstanceProfile"
+      ],
+      "Properties": {
+        "KeyName": {
+          "Ref": "KeyName"
+        },
+        "IamInstanceProfile": {
+          "Ref": "EC2InstanceProfile"
+        },
+        "ImageId": {
+          "Fn::FindInMap": [
+            "AWSRegionArch2AMI",
+            {
+              "Ref": "AWS::Region"
+            },
+            {
+              "Fn::FindInMap": [
+                "AWSInstanceType2Arch",
+                {
+                  "Ref": "InstanceType"
+                },
+                "Arch"
+              ]
+            }
+          ]
+        },
+        "NetworkInterfaces": [
+          {
+            "AssociatePublicIpAddress": "true",
+            "DeviceIndex": "0",
+            "SubnetId": {
+              "Ref": "DMZSubnet01"
+            },
+            "GroupSet": [
+              {
+                "Ref": "HttpPortOpenSecurityGroup"
+              },
+              {
+                "Ref": "BastionHostSecurityGroup"
+              }
+            ]
+          }
+        ],
+        "InstanceType": {
+          "Ref": "InstanceType"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "CodePipelineDeploymentGroupName"
+            }
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash \n",
+                "yum install aws-cfn-bootstrap -y \n",
+                "yum install aws-cli -y \n",
+                "#install web server \n",
+                "instanceId=$(curl http://169.254.169.254/latest/meta-data/instance-id) \n",
+                "yum install httpd -y \n",
+                "chkconfig --level 235 httpd on \n",
+                "service httpd start \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Check back soon for updates</h3></body></head></html>\" > /var/www/html/index.html \n",
+                "#install stress \n",
+                "yum install stress -y \n",
+                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Step 1</h3></body></head></html>\" > /var/www/html/index.html \n",
+                "curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O \n",
+                "unzip CloudWatchMonitoringScripts-1.2.1.zip \n",
+                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Step 2</h3></body></head></html>\" > /var/www/html/index.html \n",
+                "cd /home/ec2-user/ \n",
+                "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
+                "yum -y install codedeploy-agent.noarch.rpm \n",
+                "rm codedeploy-agent.noarch.rpm -f \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>End - check back soon </h3></body></head></html>\" > /var/www/html/index.html \n"
+              ]
+            ]
+          }
+        }
+      }
+    }
+  }
+}
