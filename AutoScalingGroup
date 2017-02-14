@@ -43,6 +43,16 @@
         true,
         false
       ]
+    },
+    "WebServersUsePulicIp": {
+      "Description": "Get public ip for web servers on DMZ",
+      "Type": "String",
+      "ConstraintDescription": "When enabled, you will be able to connect directly to the webservers without using the NLB",
+      "Default": false,
+      "AllowedValues": [
+        true,
+        false
+      ]
     }
   },
   "Mappings": {
@@ -399,15 +409,13 @@
         "KeyName": {
           "Ref": "KeyName"
         },
+        "AssociatePublicIpAddress": { "Ref": "WebServersUsePulicIp" },
         "InstanceMonitoring": {
           "Ref": "EnableCloudWatch"
         },
         "SecurityGroups": [
           {
             "Ref": "HttpPortOpenSecurityGroup"
-          },
-          {
-            "Ref": "BastionHostSecurityGroup"
           }
         ],
         "IamInstanceProfile": {
