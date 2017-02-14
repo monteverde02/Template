@@ -454,23 +454,23 @@
                 "yum install httpd -y \n",
                 "chkconfig --level 235 httpd on \n",
                 "service httpd start \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Check back soon for updates</h3></body></head></html>\" > /var/www/html/index.html \n",
-                "#install stress \n",
-                "yum install stress -y \n",
-                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Step 1</h3></body></head></html>\" > /var/www/html/index.html \n",
-                "curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O \n",
-                "unzip CloudWatchMonitoringScripts-1.2.1.zip \n",
-                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>Step 2</h3></body></head></html>\" > /var/www/html/index.html \n",
                 "cd /home/ec2-user/ \n",
                 "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
                 "yum -y install codedeploy-agent.noarch.rpm \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>0 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
+                "#install stress \n",
+                "yum install stress -y \n",
+                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>1 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
+                "curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O \n",
+                "unzip CloudWatchMonitoringScripts-1.2.1.zip \n",
+                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>2 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
                 "cd /tmp \n",
                 "curl https://amazon-ssm-us-west-2.s3.amazonaws.com/latest/linux_amd64/amazon-ssm-agent.rpm -o amazon-ssm-agent.rpm \n",
                 "yum install -y amazon-ssm-agent.rpm \n",
                 "rm amazon-ssm-agent.rpm -f \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>End - check back soon </h3></body></head></html>\" > /var/www/html/index.html \n"
+                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>3 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n"
               ]
             ]
           }
@@ -513,7 +513,7 @@
           },
           {
             "Key": "Name",
-            "Value": "Dev",
+            "Value": "Dev-Environment",
             "PropagateAtLaunch": "true"
           }
         ],
@@ -522,7 +522,7 @@
         },
         "MinSize": "1",
         "MaxSize": "2",
-        "HealthCheckGracePeriod": "60",
+        "HealthCheckGracePeriod": "1600",
         "HealthCheckType": "ELB",
         "LoadBalancerNames": [
           {
@@ -548,7 +548,8 @@
               "GroupMaxSize"
             ]
           }
-        ]
+        ],
+        "TerminationPolicies": "ClosestToNextInstanceHour"
       },
       "DependsOn": [
         "DMZSubnet02",
