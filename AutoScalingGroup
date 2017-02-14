@@ -104,7 +104,7 @@
     }
   },
   "Resources": {
-    "RamirosBuildPipelineStory": {
+    "VPCWeb": {
       "Type": "AWS::EC2::VPC",
       "Properties": {
         "CidrBlock": "10.10.0.0/16",
@@ -114,7 +114,7 @@
         "Tags": [
           {
             "Key": "WebApplicationVPC",
-            "Value": "RamirosBuildPipelineStory"
+            "Value": "VPCWeb"
           }
         ]
       }
@@ -126,20 +126,20 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "RamirosBuildPipelineStory"
+              "Ref": "VPCWeb"
             }
           }
         ]
       },
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ]
     },
     "AttachVpnGateway": {
       "Type": "AWS::EC2::VPCGatewayAttachment",
       "Properties": {
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "InternetGatewayId": {
           "Ref": "InternetGateway"
@@ -170,13 +170,13 @@
       "Type": "AWS::EC2::RouteTable",
       "Properties": {
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
             "Key": "Name",
             "Value": {
-              "Ref": "RamirosBuildPipelineStory"
+              "Ref": "VPCWeb"
             }
           }
         ]
@@ -187,7 +187,7 @@
       "Properties": {
         "GroupDescription": "HTTP from the world inboud",
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
@@ -205,18 +205,18 @@
         ]
       },
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ]
     },
     "PrivateSubnetSecurityGroup": {
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ],
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
         "GroupDescription": "Rule to block all inbound traffic from the net",
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
@@ -231,7 +231,7 @@
       "Properties": {
         "GroupDescription": "RDP connection to Bastion Host",
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
@@ -255,7 +255,7 @@
         ]
       },
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ]
     },
     "DMZSubnet01": {
@@ -265,19 +265,19 @@
         "CidrBlock": "10.10.3.0/24",
         "MapPublicIpOnLaunch": "true",
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
             "Key": "Name",
             "Value": {
-              "Ref": "RamirosBuildPipelineStory"
+              "Ref": "VPCWeb"
             }
           }
         ]
       },
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ]
     },
     "DMZSubnet01Association": {
@@ -301,19 +301,19 @@
         "CidrBlock": "10.10.2.0/24",
         "MapPublicIpOnLaunch": "true",
         "VpcId": {
-          "Ref": "RamirosBuildPipelineStory"
+          "Ref": "VPCWeb"
         },
         "Tags": [
           {
             "Key": "Name",
             "Value": {
-              "Ref": "RamirosBuildPipelineStory"
+              "Ref": "VPCWeb"
             }
           }
         ]
       },
       "DependsOn": [
-        "RamirosBuildPipelineStory"
+        "VPCWeb"
       ]
     },
     "DMZSubnet02Association": {
@@ -448,29 +448,23 @@
               [
                 "#!/bin/bash \n",
                 "yum install aws-cfn-bootstrap -y \n",
-                "yum install aws-cli -y \n",
-                "#install web server \n",
+                "yum install aws-cli -y \n",                
                 "instanceId=$(curl http://169.254.169.254/latest/meta-data/instance-id) \n",
                 "yum install httpd -y \n",
                 "chkconfig --level 235 httpd on \n",
                 "service httpd start \n",
-                "cd /home/ec2-user/ \n",
+                "cd /home/ec2-user/ \n",                
                 "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
-                "yum -y install codedeploy-agent.noarch.rpm \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>0 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
-                "#install stress \n",
+                "yum -y install codedeploy-agent.noarch.rpm \n",                
                 "yum install stress -y \n",
-                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>1 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
+                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",                
                 "curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O \n",
                 "unzip CloudWatchMonitoringScripts-1.2.1.zip \n",
-                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>2 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n",
+                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",                
                 "cd /tmp \n",
                 "curl https://amazon-ssm-us-west-2.s3.amazonaws.com/latest/linux_amd64/amazon-ssm-agent.rpm -o amazon-ssm-agent.rpm \n",
                 "yum install -y amazon-ssm-agent.rpm \n",
-                "rm amazon-ssm-agent.rpm -f \n",
-                "echo \"<html><head><body> <h1>$instanceId</h1><br/><br/><h3>3 Check back soon for updates</h3></body></head></html>\" > /var/www/html/sampleIndex.html \n"
+                "rm amazon-ssm-agent.rpm -f \n"                
               ]
             ]
           }
@@ -508,7 +502,7 @@
         "Tags": [
           {
             "Key": "WebApplicationVPC",
-            "Value": "RamirosBuildPipelineStory",
+            "Value": "VPCWeb",
             "PropagateAtLaunch": "true"
           },
           {
@@ -549,7 +543,7 @@
             ]
           }
         ],
-        "TerminationPolicies": "ClosestToNextInstanceHour"
+        "TerminationPolicies": [ "ClosestToNextInstanceHour" ]
       },
       "DependsOn": [
         "DMZSubnet02",
