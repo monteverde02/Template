@@ -19,7 +19,7 @@
       "Default": "OR-AWS"
     },
     "CodePipelineDeploymentGroupName": {
-      "Description": "The EC2 Key Pair to allow SSH access to EC2 instances",
+      "Description": "The target environment prefix name",
       "Type": "String",
       "ConstraintDescription": "Enter the code pipeline that this set is expected to attach..",
       "Default": "Dev",
@@ -182,7 +182,7 @@
         ]
       }
     },
-    "HttpPortOpenSecurityGroup": {
+    "DMZSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
         "GroupDescription": "HTTP from the world inboud",
@@ -192,7 +192,21 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "OpenPort80"
+            "Value": "DMZ"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
           }
         ],
         "SecurityGroupIngress": [
@@ -201,11 +215,59 @@
             "FromPort": "80",
             "ToPort": "80",
             "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ]
+      }
+    },
+    "WebServersSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "HTTP from the world inboud",
+        "VpcId": {
+          "Ref": "VPCWeb"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "WebServers"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "SourceSecurityGroupId": { "Ref": "DMZSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3389",
+            "ToPort": "3389",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+          },
+          {
+            "IpProtocol": "icmp",
+            "FromPort": "8",
+            "ToPort": "-1",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
           }
         ]
       },
       "DependsOn": [
-        "VPCWeb"
+        "VPCWeb",
+        "BastionHostSecurityGroup"
       ]
     },
     "PrivateSubnetSecurityGroup": {
@@ -222,6 +284,38 @@
           {
             "Key": "Name",
             "Value": "PrivateSubnetSecurityGroup"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3306",
+            "ToPort": "3306",
+            "SourceSecurityGroupId": { "Ref": "DMZSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3306",
+            "ToPort": "3306",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3389",
+            "ToPort": "3389",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+          },
+          {
+            "IpProtocol": "icmp",
+            "FromPort": "8",
+            "ToPort": "-1",
+            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
           }
         ]
       }
@@ -292,6 +386,42 @@
       },
       "DependsOn": [
         "DMZSubnet01"
+      ]
+    },
+    "BastionHostSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "AvailabilityZone": "us-west-2a",
+        "CidrBlock": "10.10.4.0/24",
+        "MapPublicIpOnLaunch": "true",
+        "VpcId": {
+          "Ref": "VPCWeb"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Ref": "VPCWeb"
+            }
+          }
+        ]
+      },
+      "DependsOn": [
+        "VPCWeb"
+      ]
+    },
+    "BastionHostSubnetAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "BastionHostSubnet"
+        },
+        "RouteTableId": {
+          "Ref": "RoutingTable"
+        }
+      },
+      "DependsOn": [
+        "BastionHostSubnet"
       ]
     },
     "DMZSubnet02": {
@@ -415,7 +545,7 @@
         },
         "SecurityGroups": [
           {
-            "Ref": "HttpPortOpenSecurityGroup"
+            "Ref": "WebServersSecurityGroup"
           }
         ],
         "IamInstanceProfile": {
@@ -448,23 +578,23 @@
               [
                 "#!/bin/bash \n",
                 "yum install aws-cfn-bootstrap -y \n",
-                "yum install aws-cli -y \n",                
+                "yum install aws-cli -y \n",
                 "instanceId=$(curl http://169.254.169.254/latest/meta-data/instance-id) \n",
                 "yum install httpd -y \n",
                 "chkconfig --level 235 httpd on \n",
                 "service httpd start \n",
-                "cd /home/ec2-user/ \n",                
+                "cd /home/ec2-user/ \n",
                 "aws s3 cp s3://aws-codedeploy-us-west-2/latest/codedeploy-agent.noarch.rpm . --region us-west-2 \n",
-                "yum -y install codedeploy-agent.noarch.rpm \n",                
+                "yum -y install codedeploy-agent.noarch.rpm \n",
                 "yum install stress -y \n",
-                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",                
+                "yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https -y \n",
                 "curl http://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.1.zip -O \n",
                 "unzip CloudWatchMonitoringScripts-1.2.1.zip \n",
-                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",                
+                "rm CloudWatchMonitoringScripts-1.2.1.zip -f \n",
                 "cd /tmp \n",
                 "curl https://amazon-ssm-us-west-2.s3.amazonaws.com/latest/linux_amd64/amazon-ssm-agent.rpm -o amazon-ssm-agent.rpm \n",
                 "yum install -y amazon-ssm-agent.rpm \n",
-                "rm amazon-ssm-agent.rpm -f \n"                
+                "rm amazon-ssm-agent.rpm -f \n"
               ]
             ]
           }
@@ -484,7 +614,7 @@
         ]
       }
     },
-    "WebServerGroup": {
+    "WebServerAutoScalingGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "AvailabilityZones": [
@@ -514,8 +644,8 @@
         "LaunchConfigurationName": {
           "Ref": "WebServerLaunchConfiguration"
         },
-        "MinSize": "1",
-        "MaxSize": "2",
+        "MinSize": "0",
+        "MaxSize": "0",
         "HealthCheckGracePeriod": "1600",
         "HealthCheckType": "ELB",
         "LoadBalancerNames": [
@@ -653,7 +783,7 @@
         ],
         "SecurityGroups": [
           {
-            "Ref": "HttpPortOpenSecurityGroup"
+            "Ref": "DMZSecurityGroup"
           }
         ],
         "CrossZone": "true",
@@ -671,6 +801,168 @@
           "Interval": "6",
           "Timeout": "2"
         }
+      }
+    },
+    "WebServersNetworkACL": {
+      "Type": "AWS::EC2::NetworkAcl",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "WebServersNetworkACL"
+          }
+        ],
+        "VpcId": { "Ref": "VPCWeb" }
+      }
+    },
+    "ACLOpenPort80Out": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "1000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "80",
+          "To": "80"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ACLOpenPort80In": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "2000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "false",
+        "PortRange": {
+          "From": "80",
+          "To": "80"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ACLOpenPort22In": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "3000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "22",
+          "To": "22"
+        },
+        "Egress": "false",
+        "CidrBlock": "10.10.0.0/16"
+      }
+    },
+    "ACLOpenPort22Out": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "4000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "22",
+          "To": "22"
+        },
+        "CidrBlock": "10.10.0.0/16"
+      }
+    },
+    "ACLOpenPort3389In": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "4000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "3389",
+          "To": "3389"
+        },
+        "Egress": "false",
+        "CidrBlock": "10.10.0.0/16"
+      }
+    },
+    "ACLOpenPort3389Out": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "5000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "3389",
+          "To": "3389"
+        },
+        "CidrBlock": "10.10.0.0/16"
+      }
+    },
+    "ACLOpenPort53TCPIn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "6000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "Egress": "false",
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ACLOpenPort53TPCOut": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "7000",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ACLOpenPort53UDPIn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "8000",
+        "Protocol": "17",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "Egress": "false",
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "ACLOpenPort53UDPOut": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "RuleNumber": "9000",
+        "Protocol": "17",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "CidrBlock": "0.0.0.0/0"
       }
     }
   }
