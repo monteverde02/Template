@@ -113,8 +113,18 @@
         "InstanceTenancy": "default",
         "Tags": [
           {
-            "Key": "WebApplicationVPC",
-            "Value": "VPCWeb"
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  "VPCWeb",
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  }
+                ]
+              ]
+            }
           }
         ]
       }
@@ -126,14 +136,25 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "VPCWeb"
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "IGW"
+                ]
+              ]
             }
           }
         ]
       },
-      "DependsOn": [
-        "VPCWeb"
-      ]
+        "DependsOn": [
+          "VPCWeb"
+        ]      
     },
     "AttachVpnGateway": {
       "Type": "AWS::EC2::VPCGatewayAttachment",
@@ -176,7 +197,18 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "VPCWeb"
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "RoutingTable"
+                ]
+              ]
             }
           }
         ]
@@ -192,7 +224,21 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "DMZ"
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "DMZ",
+                  "SG"
+                ]
+              ]
+            }
           }
         ],
         "SecurityGroupEgress": [
@@ -235,7 +281,21 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "WebServers"
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "WebSrv",
+                  "SG"
+                ]
+              ]
+            }
           }
         ],
         "SecurityGroupIngress": [
@@ -243,25 +303,33 @@
             "IpProtocol": "tcp",
             "FromPort": "80",
             "ToPort": "80",
-            "SourceSecurityGroupId": { "Ref": "DMZSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "DMZSecurityGroup"
+            }
           },
           {
             "IpProtocol": "tcp",
             "FromPort": "22",
             "ToPort": "22",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           },
           {
             "IpProtocol": "tcp",
             "FromPort": "3389",
             "ToPort": "3389",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           },
           {
             "IpProtocol": "icmp",
             "FromPort": "8",
             "ToPort": "-1",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           }
         ]
       },
@@ -283,7 +351,21 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "PrivateSubnetSecurityGroup"
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "Private",
+                  "SG"
+                ]
+              ]
+            }
           }
         ],
         "SecurityGroupIngress": [
@@ -291,31 +373,41 @@
             "IpProtocol": "tcp",
             "FromPort": "3306",
             "ToPort": "3306",
-            "SourceSecurityGroupId": { "Ref": "DMZSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "DMZSecurityGroup"
+            }
           },
           {
             "IpProtocol": "tcp",
             "FromPort": "3306",
             "ToPort": "3306",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           },
           {
             "IpProtocol": "tcp",
             "FromPort": "22",
             "ToPort": "22",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           },
           {
             "IpProtocol": "tcp",
             "FromPort": "3389",
             "ToPort": "3389",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           },
           {
             "IpProtocol": "icmp",
             "FromPort": "8",
             "ToPort": "-1",
-            "SourceSecurityGroupId": { "Ref": "BastionHostSecurityGroup" }
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
           }
         ]
       }
@@ -330,7 +422,21 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "BastionHostSecurityGroup"
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "Bastion",
+                  "SG"
+                ]
+              ]
+            }
           }
         ],
         "SecurityGroupIngress": [
@@ -365,7 +471,19 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "VPCWeb"
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "DMZ",
+                  "10.10.3.0"
+                ]
+              ]
             }
           }
         ]
@@ -401,7 +519,19 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "VPCWeb"
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "DMZ",
+                  "10.10.4.0"
+                ]
+              ]
             }
           }
         ]
@@ -437,7 +567,19 @@
           {
             "Key": "Name",
             "Value": {
-              "Ref": "VPCWeb"
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "DMZ",
+                  "10.10.2.0"
+                ]
+              ]
             }
           }
         ]
@@ -539,7 +681,9 @@
         "KeyName": {
           "Ref": "KeyName"
         },
-        "AssociatePublicIpAddress": { "Ref": "WebServersUsePulicIp" },
+        "AssociatePublicIpAddress": {
+          "Ref": "WebServersUsePulicIp"
+        },
         "InstanceMonitoring": {
           "Ref": "EnableCloudWatch"
         },
@@ -637,7 +781,20 @@
           },
           {
             "Key": "Name",
-            "Value": "Dev-Environment",
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "Auto-Scaling-Group"
+                ]
+              ]
+            },
             "PropagateAtLaunch": "true"
           }
         ],
@@ -673,7 +830,9 @@
             ]
           }
         ],
-        "TerminationPolicies": [ "ClosestToNextInstanceHour" ]
+        "TerminationPolicies": [
+          "ClosestToNextInstanceHour"
+        ]
       },
       "DependsOn": [
         "DMZSubnet02",
@@ -687,13 +846,13 @@
       "Properties": {
         "AdjustmentType": "ChangeInCapacity",
         "AutoScalingGroupName": {
-          "Ref": "WebServerGroup"
+          "Ref": "WebServerAutoScalingGroup"
         },
         "Cooldown": "360",
         "ScalingAdjustment": "1"
       },
       "DependsOn": [
-        "WebServerGroup"
+        "WebServerAutoScalingGroup"
       ]
     },
     "WebServerScaleDownPolicy": {
@@ -701,13 +860,13 @@
       "Properties": {
         "AdjustmentType": "ChangeInCapacity",
         "AutoScalingGroupName": {
-          "Ref": "WebServerGroup"
+          "Ref": "WebServerAutoScalingGroup"
         },
         "Cooldown": "360",
         "ScalingAdjustment": "-1"
       },
       "DependsOn": [
-        "WebServerGroup"
+        "WebServerAutoScalingGroup"
       ]
     },
     "CPUAlarmHigh": {
@@ -729,14 +888,14 @@
           {
             "Name": "AutoScalingGroupName",
             "Value": {
-              "Ref": "WebServerGroup"
+              "Ref": "WebServerAutoScalingGroup"
             }
           }
         ],
         "ComparisonOperator": "GreaterThanThreshold"
       },
       "DependsOn": [
-        "WebServerGroup",
+        "WebServerAutoScalingGroup",
         "WebServerScaleUpPolicy"
       ]
     },
@@ -759,20 +918,39 @@
           {
             "Name": "AutoScalingGroupName",
             "Value": {
-              "Ref": "WebServerGroup"
+              "Ref": "WebServerAutoScalingGroup"
             }
           }
         ],
         "ComparisonOperator": "LessThanThreshold"
       },
       "DependsOn": [
-        "WebServerGroup",
+        "WebServerAutoScalingGroup",
         "WebServerScaleDownPolicy"
       ]
     },
     "ElasticLoadBalancer": {
       "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "ELB"
+                ]
+              ]
+            }
+          }
+        ],
         "Subnets": [
           {
             "Ref": "DMZSubnet01"
@@ -809,16 +987,33 @@
         "Tags": [
           {
             "Key": "Name",
-            "Value": "WebServersNetworkACL"
+            "Value": {
+              "Fn::Join": [
+                "-",
+                [
+                  {
+                    "Ref": "VPCWeb"
+                  },
+                  {
+                    "Ref": "CodePipelineDeploymentGroupName"
+                  },
+                  "ACL"
+                ]
+              ]
+            }
           }
         ],
-        "VpcId": { "Ref": "VPCWeb" }
+        "VpcId": {
+          "Ref": "VPCWeb"
+        }
       }
     },
     "ACLOpenPort80Out": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "1000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -833,7 +1028,9 @@
     "ACLOpenPort80In": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "2000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -848,7 +1045,9 @@
     "ACLOpenPort22In": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "3000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -863,7 +1062,9 @@
     "ACLOpenPort22Out": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "4000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -878,7 +1079,9 @@
     "ACLOpenPort3389In": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "4000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -893,7 +1096,9 @@
     "ACLOpenPort3389Out": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "5000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -908,7 +1113,9 @@
     "ACLOpenPort53TCPIn": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "6000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -923,7 +1130,9 @@
     "ACLOpenPort53TPCOut": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "7000",
         "Protocol": "6",
         "RuleAction": "allow",
@@ -938,7 +1147,9 @@
     "ACLOpenPort53UDPIn": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "8000",
         "Protocol": "17",
         "RuleAction": "allow",
@@ -953,7 +1164,9 @@
     "ACLOpenPort53UDPOut": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
-        "NetworkAclId": { "Ref": "WebServersNetworkACL" },
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
         "RuleNumber": "9000",
         "Protocol": "17",
         "RuleAction": "allow",
