@@ -330,6 +330,14 @@
             }
           },
           {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "SourceSecurityGroupId": {
+              "Ref": "BastionHostSecurityGroup"
+            }
+          },
+          {
             "IpProtocol": "icmp",
             "FromPort": "8",
             "ToPort": "-1",
@@ -1049,13 +1057,13 @@
         "CidrBlock": "10.10.0.0/16"
       }
     },
-    "WebServersACLOpenPortIn": {
+    "WebServersACLOpenPort3389In": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
         "NetworkAclId": {
           "Ref": "WebServersNetworkACL"
         },
-        "RuleNumber": "200",
+        "RuleNumber": "300",
         "Protocol": "6",
         "RuleAction": "allow",
         "PortRange": {
@@ -1066,13 +1074,13 @@
         "CidrBlock": "10.10.0.0/16"
       }
     },
-    "WebServersACLOpenPort80Out": {
+    "WebServersACLOpenPort3389Out": {
       "Type": "AWS::EC2::NetworkAclEntry",
       "Properties": {
         "NetworkAclId": {
           "Ref": "WebServersNetworkACL"
         },
-        "RuleNumber": "250",
+        "RuleNumber": "350",
         "Protocol": "6",
         "RuleAction": "allow",
         "Egress": "true",
@@ -1081,6 +1089,142 @@
           "To": "3389"
         },
         "CidrBlock": "10.10.0.0/16"
+      }
+    },
+    "WebServersACLEphemoralOut": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "400",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "1000",
+          "To": "65535"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLEphemoralIn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "450",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "false",
+        "PortRange": {
+          "From": "49152",
+          "To": "65535"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLOpenPort53TCPIn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "500",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "Egress": "false",
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLOpenPort53TPCOut": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "550",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLOpenPort53UDPIn": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "600",
+        "Protocol": "17",
+        "RuleAction": "allow",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "Egress": "false",
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLOpenPort53UDPOut": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "650",
+        "Protocol": "17",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "53",
+          "To": "53"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACLE80Out": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "700",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "true",
+        "PortRange": {
+          "From": "80",
+          "To": "80"
+        },
+        "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "WebServersACL8080In": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "WebServersNetworkACL"
+        },
+        "RuleNumber": "750",
+        "Protocol": "6",
+        "RuleAction": "allow",
+        "Egress": "false",
+        "PortRange": {
+          "From": "80",
+          "To": "80"
+        },
+        "CidrBlock": "0.0.0.0/0"
       }
     },
     "BastionHostNetworkAcl": {
@@ -1347,6 +1491,27 @@
           "To": "443"
         },
         "CidrBlock": "0.0.0.0/0"
+      }
+    },
+    "AssociateDMZ01SubnetToNACL": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "DMZSubnet01" },
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" }
+      }
+    },
+    "AssociateDMZ02SubnetToNACL": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "DMZSubnet02" },
+        "NetworkAclId": { "Ref": "WebServersNetworkACL" }
+      }
+    },
+    "AssociateBastionHostSubnetToNACL": {
+      "Type": "AWS::EC2::SubnetNetworkAclAssociation",
+      "Properties": {
+        "SubnetId": { "Ref": "BastionHostSubnet" },
+        "NetworkAclId": { "Ref": "BastionHostNetworkAcl" }
       }
     }
   }
